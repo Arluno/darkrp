@@ -109,6 +109,89 @@ JAIL_WALLS = [
 ]
 JAIL_DOORS = {(48, 22), (50, 21), (50, 24)}
 
+# ── Build tile map (mirrors game/town.py) ──
+# Tile IDs: 0=grass 1=road 2=sidewalk 3=wood_floor 4=tile_floor
+#   5=wall_brick 6=wall_white 7=wall_gray 8=door 9=water
+#   10=crosswalk 11=crosswalk_h 13=wall_police 14=wall_hospital
+#   15=wall_mayor 16=wall_bank 25=jail_bars 26=jail_door
+GROUND_MAP = [[0]*WORLD_W_TILES for _ in range(WORLD_H_TILES)]
+WALL_MAP   = [[0]*WORLD_W_TILES for _ in range(WORLD_H_TILES)]
+ROOF_MAP   = [[""]*WORLD_W_TILES for _ in range(WORLD_H_TILES)]
+
+def _build_tile_map():
+    g, w, r = GROUND_MAP, WALL_MAP, ROOF_MAP
+    # Roads
+    for y in range(28, 32):
+        for x in range(WORLD_W_TILES):
+            g[y][x] = 1
+    for y in range(WORLD_H_TILES):
+        for x in range(38, 42):
+            g[y][x] = 1
+    # Sidewalks
+    for x in range(WORLD_W_TILES):
+        if not (38 <= x <= 41):
+            g[27][x] = 2; g[32][x] = 2
+    for y in range(WORLD_H_TILES):
+        if not (28 <= y <= 31):
+            g[y][37] = 2; g[y][42] = 2
+    # Crosswalks
+    for y in range(28, 32):
+        g[y][37] = 10; g[y][42] = 10
+    for x in range(38, 42):
+        g[27][x] = 11; g[32][x] = 11
+    # Water pond
+    for py in range(45, 49):
+        for px in range(15, 22):
+            g[py][px] = 9
+
+    # Building helper
+    _BWALL = {"house1":7,"house2":6,"house3":6,"police":13,"mayor":15,"bank":16,"house4":6,"house5":7,"hospital":14}
+    _BFLOOR = {"house1":3,"house2":3,"house3":3,"police":4,"mayor":4,"bank":4,"house4":3,"house5":3,"hospital":4}
+    _BROOF = {"police":"roof_police","mayor":"roof_mayor","bank":"roof_bank","hospital":"roof_hospital"}
+    for b in BUILDINGS:
+        bx, by, bw, bh = b["x"], b["y"], b["w"], b["h"]
+        wid = _BWALL.get(b["id"], 7)
+        fid = _BFLOOR.get(b["id"], 3)
+        rtx = _BROOF.get(b["id"], "roof")
+        dtx, dty = b["door"]
+        for ty in range(by, by+bh):
+            for tx in range(bx, bx+bw):
+                border = tx == bx or tx == bx+bw-1 or ty == by or ty == by+bh-1
+                if border:
+                    if tx == dtx and ty == dty:
+                        g[ty][tx] = fid; w[ty][tx] = 8
+                    else:
+                        g[ty][tx] = fid; w[ty][tx] = wid
+                else:
+                    g[ty][tx] = fid
+                r[ty][tx] = rtx
+    # Jail bars/doors inside police
+    for jwall in JAIL_WALLS:
+        for ty in range(jwall["y"], jwall["y"]+jwall["h"]):
+            for tx in range(jwall["x"], jwall["x"]+jwall["w"]):
+                if (tx, ty) in JAIL_DOORS:
+                    w[ty][tx] = 26
+                else:
+                    w[ty][tx] = 25
+    # Signs on sidewalk
+    g[27][15] = 23; g[27][27] = 23; g[14][37] = 23  # houses
+    g[23][42] = 17  # police sign
+    g[27][62] = 19  # mayor sign
+    g[32][16] = 20  # bank sign
+    g[32][28] = 23  # house4 sign
+    g[32][48] = 23  # house5 sign
+    g[32][61] = 18  # hospital sign
+
+_build_tile_map()
+
+# Compact map as flat strings for client (sent once)
+MAP_DATA = {
+    "w": WORLD_W_TILES,
+    "h": WORLD_H_TILES,
+    "ground": "".join(chr(48 + g) for row in GROUND_MAP for g in row),
+    "walls": "".join(chr(48 + w) for row in WALL_MAP for w in row),
+}
+
 
 def _deg_to_dir(angle_deg: float) -> tuple[float, float]:
     rad = math.radians(angle_deg)
@@ -654,6 +737,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
     try:
         await ws.send_text(json.dumps({"type": "welcome", "id": pid}))
+        await ws.send_text(json.dumps({"type": "map", **MAP_DATA}))
 
         while True:
             raw = await ws.receive_text()
