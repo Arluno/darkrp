@@ -123,9 +123,125 @@
       z-index: 3;
       font-size: 13px;
     }
+
+    /* ---------- LOBBY ---------- */
+    #lobby {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      background: radial-gradient(1200px 800px at 20% 10%, #243147, var(--bg1)) no-repeat,
+                  linear-gradient(160deg, var(--bg2), #11151d);
+    }
+    #lobby.hidden { display: none; }
+    #lobby h1 {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin: 0 0 6px 0;
+      background: linear-gradient(135deg, #7ed2ff, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    #lobby .subtitle {
+      color: rgba(255,255,255,0.45);
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    .server-card {
+      width: 420px;
+      max-width: 90vw;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--hud);
+      backdrop-filter: blur(8px);
+      padding: 22px 26px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .server-info { flex: 1; }
+    .server-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .server-desc {
+      font-size: 13px;
+      color: rgba(255,255,255,0.45);
+      margin-top: 4px;
+    }
+    .server-players {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .server-players .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #57df7d;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    #playBtn {
+      margin-top: 22px;
+      padding: 12px 48px;
+      font-size: 16px;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      background: linear-gradient(135deg, #7ed2ff, #6a9cff);
+      color: #111;
+      transition: transform 0.12s, box-shadow 0.12s;
+    }
+    #playBtn:hover {
+      transform: scale(1.04);
+      box-shadow: 0 4px 24px rgba(126, 210, 255, 0.35);
+    }
+    #playBtn:disabled {
+      opacity: 0.45;
+      cursor: default;
+      transform: none;
+      box-shadow: none;
+    }
+    #lobbyName {
+      margin-top: 16px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 14px;
+      width: 220px;
+      text-align: center;
+      font-size: 15px;
+    }
+    #lobbyName::placeholder { color: rgba(255,255,255,0.3); }
   </style>
 </head>
 <body>
+  <!-- LOBBY -->
+  <div id="lobby">
+    <h1>DarkRP 2D</h1>
+    <div class="subtitle">Multiplayer Roleplay</div>
+    <div class="server-card">
+      <div class="server-info">
+        <div class="server-name">Official Server</div>
+        <div class="server-desc">Jobs &bull; Guns &bull; Properties &bull; Police</div>
+      </div>
+      <div class="server-players"><span class="dot"></span><span id="playerCount">-/20</span></div>
+    </div>
+    <input id="lobbyName" maxlength="20" placeholder="Enter your name..." />
+    <button id="playBtn">Play</button>
+  </div>
+
+  <!-- GAME -->
   <canvas id="game"></canvas>
 
   <div id="hud">

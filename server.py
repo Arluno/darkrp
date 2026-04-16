@@ -21,6 +21,7 @@ SALARY_INTERVAL_S = 30.0
 HUNGER_DRAIN_PER_S = 0.7
 THIRST_DRAIN_PER_S = 1.0
 STARVATION_DAMAGE_PER_S = 1.2
+MAX_PLAYERS = 20
 
 JOBS = [
     {"name": "Citizen", "salary": 0, "color": "#b4b4b4"},
@@ -635,6 +636,11 @@ async def startup() -> None:
 @app.get("/")
 async def root() -> FileResponse:
     return FileResponse(web_dir / "index.html")
+
+
+@app.get("/api/status")
+async def api_status():
+    return {"players": len(players), "max_players": MAX_PLAYERS}
 
 
 @app.websocket("/ws")

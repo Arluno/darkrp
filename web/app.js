@@ -6,6 +6,12 @@ const jobEl = document.getElementById('job');
 const statsEl = document.getElementById('stats');
 const hotbarEl = document.getElementById('hotbar');
 const invEl = document.getElementById('inv');
+const lobbyEl = document.getElementById('lobby');
+const lobbyNameEl = document.getElementById('lobbyName');
+const playBtn = document.getElementById('playBtn');
+const playerCountEl = document.getElementById('playerCount');
+
+let inLobby = true;
 
 let ws = null;
 let myId = null;
@@ -325,6 +331,38 @@ function loop() {
   ctx.strokeRect(-camX, -camY, world.w, world.h);
 }
 
-connect();
-renderHud();
+// ---- Lobby ----
+async function fetchStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    playerCountEl.textContent = `${d.players}/${d.max_players}`;
+    playBtn.disabled = d.players >= d.max_players;
+  } catch {
+    playerCountEl.textContent = '-/20';
+  }
+}
+
+function startLobbyPolling() {
+  fetchStatus();
+  return setInterval(fetchStatus, 3000);
+}
+
+let lobbyInterval = startLobbyPolling();
+
+playBtn.addEventListener('click', () => {
+  const chosen = lobbyNameEl.value.trim();
+  if (!chosen) { lobbyNameEl.focus(); return; }
+  nameEl.value = chosen;
+  lobbyEl.classList.add('hidden');
+  inLobby = false;
+  clearInterval(lobbyInterval);
+  connect();
+  renderHud();
+});
+
+lobbyNameEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') playBtn.click();
+});
+
 loop();
