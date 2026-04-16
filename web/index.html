@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DarkRP Web Multiplayer</title>
+  <style>
+    :root {
+      --bg1: #13161d;
+      --bg2: #1f2632;
+      --hud: rgba(10, 12, 16, 0.78);
+      --line: rgba(255, 255, 255, 0.09);
+      --text: #eaf0ff;
+      --accent: #7ed2ff;
+    }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(1200px 800px at 20% 10%, #243147, var(--bg1)) no-repeat,
+                  linear-gradient(160deg, var(--bg2), #11151d);
+      overflow: hidden;
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #game {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+    #hud {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      background: var(--hud);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      backdrop-filter: blur(6px);
+      z-index: 3;
+    }
+    #name {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      width: 180px;
+    }
+    #job {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    #status {
+      margin-left: auto;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    #stats {
+      display: flex;
+      gap: 8px;
+      font-size: 13px;
+      opacity: 0.92;
+    }
+    #hotbar {
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      z-index: 4;
+    }
+    .slot {
+      width: 86px;
+      min-height: 54px;
+      border: 1px solid var(--line);
+      background: var(--hud);
+      border-radius: 10px;
+      padding: 6px;
+      font-size: 12px;
+      line-height: 1.2;
+      box-sizing: border-box;
+    }
+    .slot.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent) inset;
+    }
+    #inv {
+      position: fixed;
+      right: 12px;
+      top: 74px;
+      width: 220px;
+      max-height: 50vh;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--hud);
+      padding: 10px;
+      z-index: 4;
+      font-size: 12px;
+      display: none;
+    }
+    #inv.open {
+      display: block;
+    }
+    #help {
+      position: fixed;
+      bottom: 12px;
+      left: 12px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--hud);
+      z-index: 3;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <input id="name" maxlength="20" placeholder="Your Name" />
+    <select id="job"></select>
+    <div id="stats">HP 100 | H 100 | T 100 | $5000</div>
+    <div id="status">Connecting...</div>
+  </div>
+
+  <div id="inv"></div>
+  <div id="hotbar"></div>
+
+  <div id="help">WASD move | 1-5 select hotbar | U use | Q drop | G pickup | Y detain | [ ] sentence | E buy | F sell | L lock | Tab inventory</div>
+
+  <script src="/web/app.js"></script>
+</body>
+</html>
