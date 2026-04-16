@@ -406,39 +406,135 @@ function drawRoofs(camX, camY) {
   }
 }
 
+// ── Job outfit definitions (matching desktop JOB_OUTFITS) ──
+const JOB_OUTFITS = [
+  { clothes: '#ebebeb', hat: null },
+  { clothes: '#4678d2', hat: { type: 'police', color: '#233c78' } },
+  { clothes: '#d24646', hat: { type: 'cap', color: '#dcdcdc', accent: '#c83232' } },
+  { clothes: '#af8c41', hat: { type: 'top', color: '#282828' } },
+  { clothes: '#a55f37', hat: { type: 'beanie', color: '#3c3c41' } },
+  { clothes: '#ebebeb', hat: { type: 'chef', color: '#f5f5f5' } },
+  { clothes: '#783737', hat: { type: 'beanie', color: '#2d2d32' } },
+  { clothes: '#379669', hat: { type: 'fedora', color: '#323c46' } },
+];
+
+// Item icon colors for dropped items & hotbar
+const ITEM_COLORS = {
+  food: '#c88c46', water: '#4696dc', medkit: '#d24646', toolkit: '#8c8c96',
+  metal: '#aaaab4', soda: '#eb785a', bandage: '#dcdccd', battery: '#78d25a',
+  lockpick: '#b4b4b9', cuffs: '#9696a0', pistol: '#464650', shotgun: '#5f503c',
+  pistol_ammo: '#e6be5a', shells: '#dc3c3c',
+};
+
+// Pre-render player body sprites per job
+const bodyCache = {};
+function getBodySprite(jobIdx) {
+  if (bodyCache[jobIdx]) return bodyCache[jobIdx];
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 32;
+  const x = c.getContext('2d');
+  const outfit = JOB_OUTFITS[jobIdx] || JOB_OUTFITS[0];
+  const col = outfit.clothes;
+  // Torso ellipse
+  x.fillStyle = col;
+  x.beginPath(); x.ellipse(16, 16, 9, 6, 0, 0, Math.PI * 2); x.fill();
+  // Darker lower body
+  x.globalAlpha = 0.85;
+  x.beginPath(); x.ellipse(16, 21, 8, 6, 0, 0, Math.PI * 2); x.fill();
+  x.globalAlpha = 1;
+  // Arms
+  x.beginPath(); x.arc(9, 16, 3, 0, Math.PI * 2); x.fill();
+  x.beginPath(); x.arc(23, 16, 3, 0, Math.PI * 2); x.fill();
+  bodyCache[jobIdx] = c;
+  return c;
+}
+
+// Pre-render player head sprites per job
+const headCache = {};
+function getHeadSprite(jobIdx) {
+  if (headCache[jobIdx]) return headCache[jobIdx];
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 32;
+  const x = c.getContext('2d');
+  const outfit = JOB_OUTFITS[jobIdx] || JOB_OUTFITS[0];
+  // Skin head
+  x.fillStyle = '#dcb99b';
+  x.beginPath(); x.arc(16, 10, 6, 0, Math.PI * 2); x.fill();
+  x.strokeStyle = '#b4916c';
+  x.lineWidth = 1;
+  x.beginPath(); x.arc(16, 10, 6, 0, Math.PI * 2); x.stroke();
+  // Face direction triangle
+  x.fillStyle = '#fafafa';
+  x.beginPath(); x.moveTo(16, 2); x.lineTo(13, 6); x.lineTo(19, 6); x.closePath(); x.fill();
+  // Hat
+  const hat = outfit.hat;
+  if (hat) {
+    x.fillStyle = hat.color;
+    if (hat.type === 'police') {
+      x.fillRect(10, 2, 12, 4);
+      x.fillStyle = '#ebb750';
+      x.fillRect(15, 3, 2, 2);
+    } else if (hat.type === 'chef') {
+      x.beginPath(); x.ellipse(16, 3, 7, 4, 0, 0, Math.PI * 2); x.fill();
+    } else if (hat.type === 'top') {
+      x.fillRect(12, 1, 8, 6);
+    } else if (hat.type === 'beanie') {
+      x.beginPath(); x.ellipse(16, 5, 6, 3, 0, 0, Math.PI * 2); x.fill();
+    } else if (hat.type === 'fedora') {
+      x.beginPath(); x.ellipse(16, 6, 7, 2, 0, 0, Math.PI * 2); x.fill();
+      x.fillRect(11, 1, 10, 5);
+    } else { // cap
+      x.beginPath(); x.ellipse(16, 4, 6, 3, 0, 0, Math.PI * 2); x.fill();
+    }
+  }
+  headCache[jobIdx] = c;
+  return c;
+}
+
 function drawPlayer(p, isMe, camX, camY) {
   const sx = p.x - camX;
   const sy = p.y - camY;
-  const job = jobs[p.job] || jobs[0] || { color: '#b4b4b4', name: 'Citizen' };
+  const jobIdx = p.job || 0;
 
-  ctx.fillStyle = job.color || '#b4b4b4';
-  ctx.beginPath();
-  ctx.arc(sx, sy, 12, 0, Math.PI * 2);
-  ctx.fill();
+  // Body (fixed orientation)
+  const body = getBodySprite(jobIdx);
+  ctx.drawImage(body, sx - 16, sy - 14);
 
-  const a = ((p.angle || 0) - 90) * Math.PI / 180;
-  const hx = sx + Math.cos(a) * 8;
-  const hy = sy + Math.sin(a) * 8;
-  ctx.fillStyle = '#f2efe7';
-  ctx.beginPath();
-  ctx.arc(hx, hy, 5, 0, Math.PI * 2);
-  ctx.fill();
+  // Head (rotates with aim)
+  const head = getHeadSprite(jobIdx);
+  const a = -((p.angle || 0)) * Math.PI / 180;
+  ctx.save();
+  ctx.translate(sx, sy - 4);
+  ctx.rotate(a);
+  ctx.drawImage(head, -16, -16);
+  ctx.restore();
 
-  ctx.font = '12px Segoe UI';
+  // Name label
+  ctx.font = 'bold 12px Segoe UI';
   ctx.textAlign = 'center';
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.lineWidth = 3;
+  ctx.strokeText(p.name || p.id, sx, sy - 22);
   ctx.fillStyle = isMe ? '#7ed2ff' : '#ffffff';
-  ctx.fillText(p.name || p.id, sx, sy - 18);
+  ctx.fillText(p.name || p.id, sx, sy - 22);
 
+  // Health bar
+  const hbw = 28, hbh = 4;
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.fillRect(sx - 14, sy + 15, 28, 4);
-  ctx.fillStyle = '#57df7d';
-  ctx.fillRect(sx - 14, sy + 15, Math.max(0, Math.min(28, (p.health || 0) * 0.28)), 4);
+  ctx.fillRect(sx - hbw/2, sy + 16, hbw, hbh);
+  const hpFill = Math.max(0, Math.min(1, (p.health || 0) / 100));
+  const r = Math.round(210 * (0.4 + 0.6 * hpFill));
+  const g = Math.round(70 * (0.4 + 0.6 * hpFill));
+  const b = Math.round(70 * (0.4 + 0.6 * hpFill));
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillRect(sx - hbw/2, sy + 16, hbw * hpFill, hbh);
 
+  // Detained/jail indicator
   if (p.detained || p.in_jail) {
     ctx.strokeStyle = '#f2bf5b';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(sx, sy, 16, 0, Math.PI * 2);
+    ctx.arc(sx, sy, 18, 0, Math.PI * 2);
     ctx.stroke();
   }
 }
@@ -448,23 +544,22 @@ function drawBuildings(camX, camY) {
   buildings.forEach((b) => {
     const x = b.x * tile - camX;
     const y = b.y * tile - camY;
-    const w = b.w * tile;
 
-    // Building name label
+    // Building name label above roof
     ctx.font = 'bold 13px Segoe UI';
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#eaf0ff';
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.lineWidth = 3;
     const owner = b.owner ? ` (${b.owner})` : '';
     const label = `${b.name}${owner}`;
     ctx.strokeText(label, x + 6, y - 6);
+    ctx.fillStyle = '#eaf0ff';
     ctx.fillText(label, x + 6, y - 6);
 
-    // Door indicator
-    const doorX = b.door[0] * tile - camX;
-    const doorY = b.door[1] * tile - camY;
+    // Locked door overlay
     if (b.locked) {
+      const doorX = b.door[0] * tile - camX;
+      const doorY = b.door[1] * tile - camY;
       ctx.fillStyle = 'rgba(255,80,80,0.4)';
       ctx.fillRect(doorX + 2, doorY + 2, tile - 4, tile - 4);
     }
@@ -475,10 +570,23 @@ function drawDropped(camX, camY) {
   droppedItems.forEach((d) => {
     const x = d.x - camX;
     const y = d.y - camY;
-    ctx.fillStyle = '#f4d36e';
-    ctx.beginPath();
-    ctx.arc(x, y, 4, 0, Math.PI * 2);
-    ctx.fill();
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.ellipse(x, y + 8, 9, 4, 0, 0, Math.PI * 2); ctx.fill();
+    // Item icon circle
+    const col = ITEM_COLORS[d.id] || '#f4d36e';
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.stroke();
+    // Count
+    if (d.count > 1) {
+      ctx.font = 'bold 10px Consolas';
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(d.count), x, y - 10);
+    }
   });
 }
 
@@ -486,13 +594,183 @@ function drawProjectiles(camX, camY) {
   projectiles.forEach((p) => {
     const x = p.x - camX;
     const y = p.y - camY;
-    ctx.fillStyle = '#ffec9f';
-    ctx.beginPath();
-    ctx.arc(x, y, 2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = '#ffe678';
+    ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
   });
 }
 
+// ── Indoor blackout: dim everything outside the building ──
+function drawIndoorBlackout(camX, camY) {
+  const me = players[myId];
+  if (!me) return null;
+  const tile = world.tile || 32;
+  let insideB = null;
+  for (const b of buildings) {
+    const bx = b.x * tile, by = b.y * tile;
+    const bw = b.w * tile, bh = b.h * tile;
+    if (me.x >= bx && me.x < bx + bw && me.y >= by && me.y < by + bh) {
+      insideB = b; break;
+    }
+  }
+  if (!insideB) return null;
+  // Draw full-screen dark overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Cut out the building interior
+  const bx = insideB.x * tile - camX;
+  const by = insideB.y * tile - camY;
+  const bw = insideB.w * tile;
+  const bh = insideB.h * tile;
+  ctx.clearRect(bx, by, bw, bh);
+  // Redraw the building interior tiles
+  if (tileMap) {
+    for (let ty = insideB.y; ty < insideB.y + insideB.h; ty++) {
+      for (let tx = insideB.x; tx < insideB.x + insideB.w; tx++) {
+        const gid = tileMap.ground[ty * tileMap.w + tx];
+        ctx.drawImage(getTileCanvas(gid, false), tx * tile - camX, ty * tile - camY, tile, tile);
+        const wid = tileMap.walls[ty * tileMap.w + tx];
+        if (wid) ctx.drawImage(getTileCanvas(wid, true), tx * tile - camX, ty * tile - camY, tile, tile);
+      }
+    }
+  }
+  // Redraw players inside
+  Object.values(players).forEach(p => {
+    const bpx = insideB.x * tile, bpy = insideB.y * tile;
+    if (p.x >= bpx && p.x < bpx + insideB.w * tile && p.y >= bpy && p.y < bpy + insideB.h * tile) {
+      drawPlayer(p, p.id === myId, camX, camY);
+    }
+  });
+  return insideB;
+}
+
+// ── Canvas HUD (stat bars, position, money) drawn on canvas ──
+function drawCanvasHud() {
+  const me = players[myId];
+  if (!me) return;
+
+  // Position (top left)
+  const tile = world.tile || 32;
+  ctx.font = '13px Consolas';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(`X:${Math.floor(me.x / tile)} Y:${Math.floor(me.y / tile)}`, 10, canvas.height - 120);
+
+  // Stat bars (bottom left, above hotbar area)
+  const barW = 160, barH = 12, labelW = 50;
+  const barX = 10;
+  const baseY = canvas.height - 105;
+
+  function drawBar(y, fill, color, label) {
+    ctx.font = '12px Consolas';
+    ctx.fillStyle = '#ddd';
+    ctx.fillText(label, barX, y + 10);
+    const bx = barX + labelW;
+    const bw = barW - labelW;
+    // Background
+    ctx.fillStyle = '#1e1e1e';
+    ctx.fillRect(bx, y, bw, barH);
+    // Fill
+    const f = Math.max(0, Math.min(1, fill));
+    if (f > 0) {
+      const r = Math.round(color[0] * (0.4 + 0.6 * f));
+      const g = Math.round(color[1] * (0.4 + 0.6 * f));
+      const b = Math.round(color[2] * (0.4 + 0.6 * f));
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(bx, y, bw * f, barH);
+    }
+    // Border
+    ctx.strokeStyle = '#646464';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, y, bw, barH);
+  }
+  drawBar(baseY, (you.health || 0) / 100, [210, 70, 70], 'Health');
+  drawBar(baseY + 18, (you.hunger || 0) / 100, [200, 140, 50], 'Hunger');
+  drawBar(baseY + 36, (you.thirst || 0) / 100, [60, 150, 220], 'Thirst');
+
+  // Jail timer
+  if (you.in_jail) {
+    ctx.font = 'bold 14px Consolas';
+    ctx.fillStyle = '#e67878';
+    ctx.fillText(`Jail: ${formatTime(you.arrest_remaining || 0)}`, 10, canvas.height - 130);
+  }
+  if (you.detained) {
+    ctx.font = 'bold 14px Consolas';
+    ctx.fillStyle = '#f2bf5b';
+    ctx.fillText('DETAINED', 10, canvas.height - 130);
+  }
+}
+
+// ── Canvas-drawn hotbar (matching desktop) ──
+function drawCanvasHotbar() {
+  const HOTBAR_SIZE = 5;
+  const slotW = 56, slotH = 56, gap = 8;
+  const totalW = HOTBAR_SIZE * slotW + (HOTBAR_SIZE - 1) * gap;
+  const startX = canvas.width / 2 - totalW / 2;
+  const startY = canvas.height - 74;
+  const hotbar = Array.isArray(you.hotbar) ? you.hotbar : [];
+  const sel = Number(you.selected_hotbar || 0);
+
+  for (let i = 0; i < HOTBAR_SIZE; i++) {
+    const x = startX + i * (slotW + gap);
+    const y = startY;
+    const st = hotbar[i] || null;
+
+    // Slot background
+    ctx.fillStyle = '#1e1e28';
+    ctx.beginPath();
+    ctx.roundRect(x, y, slotW, slotH, 6);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = i === sel ? '#ffdc5a' : '#5a5a6e';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(x, y, slotW, slotH, 6);
+    ctx.stroke();
+
+    if (st) {
+      // Item icon (colored rect)
+      const col = ITEM_COLORS[st.id] || '#969696';
+      const ix = x + 6, iy = y + 6, iw = slotW - 12, ih = slotH - 24;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.roundRect(ix, iy, iw, ih, 4);
+      ctx.fill();
+      ctx.strokeStyle = '#141414';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(ix, iy, iw, ih, 4);
+      ctx.stroke();
+
+      // Item name
+      ctx.font = '11px Consolas';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#e6e6eb';
+      const short = (st.name || 'Item').substring(0, 8);
+      ctx.fillText(short, x + slotW / 2, y + slotH - 5);
+
+      // Count
+      ctx.font = 'bold 12px Consolas';
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(String(st.count), x + slotW - 5, y + 13);
+    }
+
+    // Slot number
+    ctx.font = '10px Consolas';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillText(String(i + 1), x + 3, y + 12);
+  }
+
+  // Money display above hotbar
+  ctx.font = 'bold 14px Consolas';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#50dc50';
+  ctx.fillText(`$${Math.round(you.money || 0)}`, canvas.width / 2, startY - 8);
+}
+
+// ── Main game loop ──
 function loop() {
   requestAnimationFrame(loop);
 
@@ -512,13 +790,18 @@ function loop() {
   drawRoofs(camX, camY);
   drawBuildings(camX, camY);
 
+  // Indoor blackout
+  drawIndoorBlackout(camX, camY);
+
+  // HUD on canvas
+  drawCanvasHud();
+  drawCanvasHotbar();
+
   // World border
   ctx.strokeStyle = 'rgba(255,255,255,0.15)';
   ctx.lineWidth = 2;
   ctx.strokeRect(-camX, -camY, world.w, world.h);
 }
-
-// ---- Lobby ----
 async function fetchStatus() {
   try {
     const r = await fetch('/api/status');

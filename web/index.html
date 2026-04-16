@@ -65,34 +65,13 @@
       font-weight: 600;
     }
     #stats {
-      display: flex;
-      gap: 8px;
-      font-size: 13px;
-      opacity: 0.92;
+      display: none;
     }
     #hotbar {
-      position: fixed;
-      bottom: 12px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 6px;
-      z-index: 4;
+      display: none;
     }
     .slot {
-      width: 86px;
-      min-height: 54px;
-      border: 1px solid var(--line);
-      background: var(--hud);
-      border-radius: 10px;
-      padding: 6px;
-      font-size: 12px;
-      line-height: 1.2;
-      box-sizing: border-box;
-    }
-    .slot.selected {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 1px var(--accent) inset;
+      display: none;
     }
     #inv {
       position: fixed;
@@ -244,7 +223,7 @@
   <!-- GAME -->
   <canvas id="game"></canvas>
 
-  <div id="hud">
+  <div id="hud" style="display:none">
     <input id="name" maxlength="20" placeholder="Your Name" />
     <select id="job"></select>
     <div id="stats">HP 100 | H 100 | T 100 | $5000</div>
@@ -254,7 +233,7 @@
   <div id="inv"></div>
   <div id="hotbar"></div>
 
-  <div id="help">WASD move | 1-5 select hotbar | U use | Q drop | G pickup | Y detain | [ ] sentence | E buy | F sell | L lock | Tab inventory</div>
+  <div id="help" style="display:none">WASD move | 1-5 select hotbar | U use | Q drop | G pickup | Y detain | [ ] sentence | E buy | F sell | L lock | Tab inventory</div>
 
   <script src="/web/app.js"></script>
 </body>
