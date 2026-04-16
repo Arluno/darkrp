@@ -161,6 +161,8 @@ let keys = { up: false, down: false, left: false, right: false };
 let mouse = { x: 0, y: 0 };
 let currentJob = 0;
 let invOpen = false;
+let chatActive = false;
+let chatText = '';
 
 function resize() {
   canvas.width = window.innerWidth;
@@ -284,6 +286,33 @@ jobEl.addEventListener('change', () => {
 });
 
 window.addEventListener('keydown', (e) => {
+  // Chat mode intercepts all keys
+  if (chatActive) {
+    e.preventDefault();
+    if (e.key === 'Enter') {
+      if (chatText.trim()) {
+        send({ type: 'action', action: 'chat', text: chatText.trim() });
+      }
+      chatActive = false;
+      chatText = '';
+    } else if (e.key === 'Escape') {
+      chatActive = false;
+      chatText = '';
+    } else if (e.key === 'Backspace') {
+      chatText = chatText.slice(0, -1);
+    } else if (e.key.length === 1 && chatText.length < 80) {
+      chatText += e.key;
+    }
+    return;
+  }
+
+  if (e.key === 't' || e.key === 'T') {
+    e.preventDefault();
+    chatActive = true;
+    chatText = '';
+    return;
+  }
+
   if (e.key === 'Tab') {
     e.preventDefault();
     invOpen = !invOpen;
@@ -537,6 +566,48 @@ function drawPlayer(p, isMe, camX, camY) {
     ctx.arc(sx, sy, 18, 0, Math.PI * 2);
     ctx.stroke();
   }
+
+  // Chat bubbles above player
+  const bubbles = p.chat_bubbles || [];
+  if (bubbles.length > 0) {
+    let yOff = -32;
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+      const [text, timer] = bubbles[i];
+      const alpha = Math.min(1, timer / 1.0);
+      ctx.globalAlpha = alpha;
+      ctx.font = '13px Consolas';
+      const tw = ctx.measureText(text).width;
+      const pad = 8;
+      const bw = tw + pad * 2;
+      const bh = 20;
+      const bx = sx - bw / 2;
+      const by = sy + yOff - bh;
+      // Bubble bg
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 6);
+      ctx.fill();
+      ctx.strokeStyle = '#b4b4be';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 6);
+      ctx.stroke();
+      // Triangle pointer
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(sx - 4, by + bh);
+      ctx.lineTo(sx + 4, by + bh);
+      ctx.lineTo(sx, by + bh + 5);
+      ctx.closePath();
+      ctx.fill();
+      // Text
+      ctx.fillStyle = '#141420';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, sx, by + 14);
+      yOff -= bh + 4;
+    }
+    ctx.globalAlpha = 1;
+  }
 }
 
 function drawBuildings(camX, camY) {
@@ -700,6 +771,22 @@ function drawCanvasHud() {
   }
 }
 
+// ── Chat input bar ──
+function drawChatInput() {
+  if (!chatActive) return;
+  const barH = 32;
+  const barY = canvas.height - barH;
+  ctx.fillStyle = 'rgba(10,10,20,0.86)';
+  ctx.fillRect(0, barY, canvas.width, barH);
+  ctx.font = '16px Consolas';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#b4b4b4';
+  ctx.fillText('Say: ', 10, barY + 22);
+  const cursor = (Math.floor(Date.now() / 500) % 2 === 0) ? '|' : '';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(chatText + cursor, 54, barY + 22);
+}
+
 // ── Canvas-drawn hotbar (matching desktop) ──
 function drawCanvasHotbar() {
   const HOTBAR_SIZE = 5;
@@ -796,6 +883,7 @@ function loop() {
   // HUD on canvas
   drawCanvasHud();
   drawCanvasHotbar();
+  drawChatInput();
 
   // World border
   ctx.strokeStyle = 'rgba(255,255,255,0.15)';

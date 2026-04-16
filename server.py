@@ -1,6 +1,7 @@
 import asyncio
 import json
 import math
+import random
 import time
 import uuid
 from pathlib import Path
@@ -51,7 +52,7 @@ ITEM_DEFS = {
         "use": {
             "type": "gun",
             "ammo": "pistol_ammo",
-            "speed": 460.0,
+            "speed": 840.0,
             "projectile_life": 0.6,
             "cooldown": 0.17,
             "spread": 2.0,
@@ -64,7 +65,7 @@ ITEM_DEFS = {
         "use": {
             "type": "gun",
             "ammo": "shells",
-            "speed": 390.0,
+            "speed": 720.0,
             "projectile_life": 0.43,
             "cooldown": 0.52,
             "spread": 9.0,
@@ -91,14 +92,14 @@ TEAM_ITEM_IDS = sorted({iid for row in JOB_LOADOUTS for iid, _ in row})
 
 # Building coordinates copied from the desktop layout footprint.
 BUILDINGS = [
-    {"id": "house1", "name": "House 1", "x": 10, "y": 19, "w": 10, "h": 8, "door": (14, 26), "government": False, "price": 1500, "owner": None, "locked": False},
-    {"id": "house2", "name": "House 2", "x": 22, "y": 19, "w": 10, "h": 8, "door": (26, 26), "government": False, "price": 1200, "owner": None, "locked": False},
-    {"id": "house3", "name": "House 3", "x": 29, "y": 10, "w": 8, "h": 7, "door": (36, 13), "government": False, "price": 800, "owner": None, "locked": False},
+    {"id": "house1", "name": "House 1", "x": 10, "y": 19, "w": 10, "h": 8, "door": (14, 26), "government": False, "price": 1500, "owner": None, "locked": False, "sign": (15, 27)},
+    {"id": "house2", "name": "House 2", "x": 22, "y": 19, "w": 10, "h": 8, "door": (26, 26), "government": False, "price": 1200, "owner": None, "locked": False, "sign": (27, 27)},
+    {"id": "house3", "name": "House 3", "x": 29, "y": 10, "w": 8, "h": 7, "door": (36, 13), "government": False, "price": 800, "owner": None, "locked": False, "sign": (37, 14)},
     {"id": "police", "name": "Police Dept", "x": 43, "y": 19, "w": 12, "h": 8, "door": (43, 22), "government": True, "price": 0, "owner": None, "locked": False, "jail_spawns": [(52, 21), (52, 24)]},
     {"id": "mayor", "name": "Mayor Office", "x": 57, "y": 19, "w": 10, "h": 8, "door": (61, 26), "government": True, "price": 0, "owner": None, "locked": False},
     {"id": "bank", "name": "Bank", "x": 10, "y": 33, "w": 12, "h": 8, "door": (15, 33), "government": True, "price": 0, "owner": None, "locked": False},
-    {"id": "house4", "name": "House 4", "x": 24, "y": 33, "w": 8, "h": 7, "door": (27, 33), "government": False, "price": 800, "owner": None, "locked": False},
-    {"id": "house5", "name": "House 5", "x": 43, "y": 33, "w": 10, "h": 8, "door": (47, 33), "government": False, "price": 1000, "owner": None, "locked": False},
+    {"id": "house4", "name": "House 4", "x": 24, "y": 33, "w": 8, "h": 7, "door": (27, 33), "government": False, "price": 800, "owner": None, "locked": False, "sign": (28, 32)},
+    {"id": "house5", "name": "House 5", "x": 43, "y": 33, "w": 10, "h": 8, "door": (47, 33), "government": False, "price": 1000, "owner": None, "locked": False, "sign": (48, 32)},
     {"id": "hospital", "name": "Hospital", "x": 55, "y": 33, "w": 12, "h": 8, "door": (60, 33), "government": True, "price": 0, "owner": None, "locked": False},
 ]
 
@@ -328,12 +329,20 @@ def _building_near(px: float, py: float, radius: float = 48.0) -> dict | None:
     return None
 
 
+# Ground tiles that are solid (block movement)
+_SOLID_GROUND = {9}  # water
+
 def _is_solid(px: float, py: float, player: dict) -> bool:
     if px < 0 or py < 0 or px >= WORLD_W or py >= WORLD_H:
         return True
 
     tx = int(px // TILE)
     ty = int(py // TILE)
+
+    # Check ground-layer solidity (water)
+    if 0 <= ty < WORLD_H_TILES and 0 <= tx < WORLD_W_TILES:
+        if GROUND_MAP[ty][tx] in _SOLID_GROUND:
+            return True
 
     for jw in JAIL_WALLS:
         if jw["x"] <= tx < jw["x"] + jw["w"] and jw["y"] <= ty < jw["y"] + jw["h"]:
@@ -442,6 +451,7 @@ def _player_payload(p: dict) -> dict:
         "money": p["money"],
         "detained": bool(p.get("detained")),
         "in_jail": bool(p.get("in_jail")),
+        "chat_bubbles": [[t, round(s, 2)] for t, s in p.get("chat_bubbles", []) if s > 0],
     }
 
 
@@ -466,6 +476,7 @@ def _new_player(pid: str) -> dict:
         "jail_y": None,
         "cuffs_sentence": 60,
         "gun_cd": 0.0,
+        "chat_bubbles": [],  # [[text, timer_s], ...]
         "salary_t": SALARY_INTERVAL_S,
         "selected_hotbar": 0,
         "hotbar": [None] * 5,
@@ -496,13 +507,19 @@ def _handle_use_item(players: dict[str, dict], pid: str, dropped_items: list, pr
     consumed = False
 
     if ut == "consume":
+        old_h, old_hu, old_th = p["health"], p["hunger"], p["thirst"]
         p["hunger"] = min(100.0, p["hunger"] + float(use.get("hunger", 0.0)))
         p["thirst"] = min(100.0, p["thirst"] + float(use.get("thirst", 0.0)))
         p["health"] = min(100.0, p["health"] + float(use.get("health", 0.0)))
-        consumed = True
+        if p["hunger"] > old_hu or p["thirst"] > old_th or p["health"] > old_h:
+            consumed = True
+            p.setdefault("chat_bubbles", []).append([f"Used {idef.get('name', 'Item')}", 1.4])
+        else:
+            p.setdefault("chat_bubbles", []).append(["Already full", 1.4])
     elif ut == "sell":
         p["money"] += int(use.get("money", 0))
         consumed = True
+        p.setdefault("chat_bubbles", []).append([f"Sold for ${use.get('money', 0)}", 1.4])
     elif ut == "toolkit":
         if p["hunger"] < 100.0 or p["thirst"] < 100.0:
             p["hunger"] = min(100.0, p["hunger"] + 20.0)
@@ -547,7 +564,7 @@ def _handle_use_item(players: dict[str, dict], pid: str, dropped_items: list, pr
         life = float(use.get("projectile_life", 0.6))
         damage = float(use.get("damage", 10))
         for _ in range(pellets):
-            a = p["angle"] + (spread * (2.0 * (time.time() % 1.0) - 1.0))
+            a = p["angle"] + random.uniform(-spread, spread)
             fx, fy = _deg_to_dir(a)
             projectiles.append({
                 "x": p["x"] + fx * 16.0,
@@ -596,6 +613,24 @@ def _tick(players: dict[str, dict], dropped_items: list, projectiles: list, dt: 
             p["money"] += int(JOBS[p["job"]]["salary"])
 
         p["gun_cd"] = max(0.0, p["gun_cd"] - dt)
+
+        # Age chat bubbles
+        bubbles = p.get("chat_bubbles", [])
+        for b in bubbles:
+            b[1] -= dt
+        p["chat_bubbles"] = [b for b in bubbles if b[1] > 0]
+
+        # Death/respawn
+        if p["health"] <= 0.0:
+            p["health"] = 100.0
+            p["hunger"] = 100.0
+            p["thirst"] = 100.0
+            p["detained"] = False
+            p["in_jail"] = False
+            p["arrest_until"] = 0.0
+            p["x"] = WORLD_W * 0.5 + (hash(p["id"]) % 120 - 60)
+            p["y"] = WORLD_H * 0.5 + (hash(p["id"][::-1]) % 120 - 60)
+            p.setdefault("chat_bubbles", []).append(["Respawned", 2.0])
 
     alive_projectiles = []
     for pr in projectiles:
@@ -732,6 +767,10 @@ async def ws_endpoint(ws: WebSocket) -> None:
     pid = uuid.uuid4().hex[:8]
 
     async with state_lock:
+        if len(players) >= MAX_PLAYERS:
+            await ws.send_text(json.dumps({"type": "error", "msg": "Server full"}))
+            await ws.close()
+            return
         clients[pid] = ws
         players[pid] = _new_player(pid)
 
@@ -834,6 +873,11 @@ async def ws_endpoint(ws: WebSocket) -> None:
                             b["owner"] = p["id"]
                             b["locked"] = False
                             p["owned_building_id"] = b["id"]
+                            # Remove sign tile
+                            sign = b.get("sign")
+                            if sign:
+                                GROUND_MAP[sign[1]][sign[0]] = 2
+                            p.setdefault("chat_bubbles", []).append([f"Bought {b['name']}", 2.0])
 
                     elif action == "sell":
                         b = _building_near(p["x"], p["y"])
@@ -842,11 +886,44 @@ async def ws_endpoint(ws: WebSocket) -> None:
                             b["owner"] = None
                             b["locked"] = False
                             p["owned_building_id"] = None
+                            # Restore sign tile
+                            sign = b.get("sign")
+                            if sign:
+                                GROUND_MAP[sign[1]][sign[0]] = 23
+                            p.setdefault("chat_bubbles", []).append([f"Sold {b['name']}", 2.0])
 
                     elif action == "lock":
                         b = _building_near(p["x"], p["y"])
                         if b and b.get("owner") == p["id"]:
                             b["locked"] = not bool(b.get("locked"))
+                            p.setdefault("chat_bubbles", []).append(
+                                ["Locked" if b["locked"] else "Unlocked", 1.4])
+
+                    elif action == "chat":
+                        text = str(data.get("text", "")).strip()[:80]
+                        if text:
+                            p.setdefault("chat_bubbles", []).append([text, 4.0])
+
+                    elif action == "inv_swap":
+                        src_kind = str(data.get("src_kind", ""))
+                        src_idx = int(data.get("src_idx", -1))
+                        dst_kind = str(data.get("dst_kind", ""))
+                        dst_idx = int(data.get("dst_idx", -1))
+                        if src_kind in ("hotbar", "inventory") and dst_kind in ("hotbar", "inventory"):
+                            src_arr = p[src_kind]
+                            dst_arr = p[dst_kind]
+                            if 0 <= src_idx < len(src_arr) and 0 <= dst_idx < len(dst_arr):
+                                src = src_arr[src_idx]
+                                dst = dst_arr[dst_idx]
+                                if src is not None:
+                                    if dst is None:
+                                        dst_arr[dst_idx] = src
+                                        src_arr[src_idx] = None
+                                    elif dst["id"] == src["id"]:
+                                        dst["count"] += src["count"]
+                                        src_arr[src_idx] = None
+                                    else:
+                                        src_arr[src_idx], dst_arr[dst_idx] = dst, src
 
     except WebSocketDisconnect:
         pass
